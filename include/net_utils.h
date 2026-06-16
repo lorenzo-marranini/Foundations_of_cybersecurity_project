@@ -20,7 +20,6 @@ ssize_t recv_full(int sockfd, void *buf, size_t len);
 // Invia dati cifrati e autenticati tramite AES-256-GCM
 ssize_t send_secure(int sockfd, const void *data, size_t data_len, const unsigned char *aes_key, uint32_t *tx_seq);
 
-
 // Riceve e decifra dati, verificandone l'integrità. Restituisce la lunghezza in chiaro o -1 in caso di manomissione.
 ssize_t recv_secure(int sockfd, void *buffer, size_t max_len, const unsigned char *aes_key, uint32_t *expected_rx_seq);
 

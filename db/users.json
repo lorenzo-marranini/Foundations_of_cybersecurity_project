@@ -2,8 +2,8 @@
 	"users":	[{
 			"username":	"studenti",
 			"password":	"studenti",
-			"consumed":	1,
-			"total":	22
+			"consumed":	12,
+			"total":	20
 		}, {
 			"username":	"admin",
 			"password":	"adminpassword",

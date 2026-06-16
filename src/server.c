@@ -116,7 +116,7 @@ void handle_client(int client_fd) {
                 OpCode err_code = OP_ERROR;
                 ErrorResponse err;
                 err.opcode = OP_ERROR;
-                strncpy(err.message, "Volume esaurito.", sizeof(err.message));
+                strncpy(err.message, "Crediti esauriti.", sizeof(err.message));
                 send_secure(client_fd, &err_code, sizeof(OpCode), aes_key, &tx_seq);
                 send_secure(client_fd, &err, sizeof(ErrorResponse), aes_key, &tx_seq);
             } else {

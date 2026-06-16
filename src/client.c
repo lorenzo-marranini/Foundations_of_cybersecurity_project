@@ -5,6 +5,7 @@
 #include "../include/protocol.h"
 #include "../include/net_utils.h"
 #include "../include/crypto_utils.h"
+#include <time.h> // Assicurati che ci sia questo include in cima!
 
 #define SERVER_IP "127.0.0.1"
 #define PORT 8080
@@ -19,10 +20,18 @@ void print_menu() {
     printf("Scelta: ");
 }
 
+void format_timestamp(time_t ts, char *output, size_t max_len) {
+    struct tm *tm_info = localtime(&ts);
+    // %H:%M:%S = Ore:Minuti:Secondi | %d/%m/%Y = Giorno/Mese/Anno
+    strftime(output, max_len, "%H:%M:%S %d/%m/%Y", tm_info);
+}
+
+
 // --- Utility: Salvataggio Certificato su File ---
 void save_timestamp_to_file(const char *original_filepath, TimestampResponse *res) {
     char ts_filename[512];
-    snprintf(ts_filename, sizeof(ts_filename), "%s.ts", original_filepath);
+    // NUOVO: Aggiungiamo l'ora di registrazione al nome del file!
+    snprintf(ts_filename, sizeof(ts_filename), "%s_%ld.ts", original_filepath, res->timestamp);
 
     FILE *f = fopen(ts_filename, "wb"); 
     if (!f) {
@@ -157,7 +166,9 @@ int main() {
                 memcpy(data_to_verify_ts + HASH_SIZE, &res.timestamp, sizeof(time_t));
 
                 if (verify_signature(data_to_verify_ts, sizeof(data_to_verify_ts), res.signature, res.signature_len, "keys/server_ts_pub.pem") == 1) {
-                    printf("[Client] Timestamp VALIDO. Ora: %ld\n", res.timestamp);
+                    char formatted_time[64];
+                    format_timestamp(res.timestamp, formatted_time, sizeof(formatted_time));
+                    printf("\n[Client] Ricezione e marcatura completata. Data/Ora: %s\n", formatted_time);
                 } else {
                     printf("[Client] ATTENZIONE! Firma del timestamp non valida.\n");
                 }
@@ -194,13 +205,16 @@ int main() {
             }
         }
         else if (choice == 4) {
-            // --- OPERAZIONE VERIFICA OFFLINE ---
+            // --- OPERAZIONE VERIFICA OFFLINE  ---
             char original_filepath[256];
             char ts_filepath[512];
 
             printf("Inserisci il percorso del file ORIGINALE da verificare: ");
             scanf("%255s", original_filepath);
-            snprintf(ts_filepath, sizeof(ts_filepath), "%s.ts", original_filepath);
+            
+            // NUOVO: Chiediamo esplicitamente il file .ts
+            printf("Inserisci il percorso del CERTIFICATO (.ts) associato: ");
+            scanf("%511s", ts_filepath);
 
             // 1. Apriamo il file originale per ricalcolare l'hash
             FILE *orig_f = fopen(original_filepath, "rb");
@@ -213,24 +227,28 @@ int main() {
             calculate_sha256(orig_buffer, orig_size, calculated_hash);
             free(orig_buffer);
 
-            // 2. Apriamo il certificato salvato localmente
+            // 2. Apriamo il certificato specificato dall'utente
             FILE *ts_f = fopen(ts_filepath, "rb");
             if (!ts_f) { 
-                printf("[Errore] Impossibile trovare il certificato associato: %s\n", ts_filepath); 
+                printf("[Errore] Impossibile trovare il certificato specificato: %s\n", ts_filepath); 
                 continue; 
             }
             TimestampResponse loaded_ts;
             fread(&loaded_ts, sizeof(TimestampResponse), 1, ts_f);
             fclose(ts_f);
 
-            // 3. Confrontiamo l'hash attuale con quello nel certificato
+            // 3. Confrontiamo l'hash (Invariato)
             if (memcmp(calculated_hash, loaded_ts.hash, HASH_SIZE) != 0) {
                 printf("\nXXX ATTENZIONE: L'hash del file NON corrisponde a quello nel certificato! XXX\n");
-                printf("Il file potrebbe essere stato modificato.\n");
+                printf("Il file potrebbe essere stato modificato o stai usando un certificato di una versione precedente.\n");
                 continue;
             }
 
-            // 4. Verifichiamo matematicamente la firma
+            // 4. Verifichiamo la firma (Invariato)
+            // ... (Tieni la stampa formattata della data che abbiamo fatto prima qui sotto!) ...
+            char formatted_time[64];
+            format_timestamp(loaded_ts.timestamp, formatted_time, sizeof(formatted_time));
+
             printf("[Client] Hash coincidente. Avvio verifica crittografica della firma del Server...\n");
             unsigned char data_to_verify_ts[HASH_SIZE + sizeof(time_t)];
             memcpy(data_to_verify_ts, loaded_ts.hash, HASH_SIZE);
@@ -238,10 +256,11 @@ int main() {
 
             if (verify_signature(data_to_verify_ts, sizeof(data_to_verify_ts), loaded_ts.signature, loaded_ts.signature_len, "keys/server_ts_pub.pem") == 1) {
                 printf("\n>>> VVV VERIFICA SUPERATA VVV <<<\n");
-                printf("La firma del Server e' autentica. Il documento esisteva integro alla data: %ld\n", loaded_ts.timestamp);
+                printf("La firma del Server e' autentica. Il documento esisteva integro in data: %s\n", formatted_time);
             } else {
                 printf("\nXXX VERIFICA FALLITA: La firma digitale del certificato NON e' valida! XXX\n");
             }
+        
         }
     } while (choice != 0);
 
