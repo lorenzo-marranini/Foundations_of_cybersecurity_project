@@ -1,0 +1,13 @@
+{
+	"users":	[{
+			"username":	"studenti",
+			"password":	"studenti",
+			"consumed":	0,
+			"total":	10
+		}, {
+			"username":	"admin",
+			"password":	"adminpassword",
+			"consumed":	0,
+			"total":	100
+		}]
+}
