@@ -14,8 +14,26 @@ void print_menu() {
     printf("1. Saldo (Balance)\n");
     printf("2. Timestamp File\n");
     printf("3. Ricarica Crediti\n");
+    printf("4. Verifica Certificato Locale (Offline)\n"); // NUOVA OPZIONE
     printf("0. Esci\n");
     printf("Scelta: ");
+}
+
+// --- Utility: Salvataggio Certificato su File ---
+void save_timestamp_to_file(const char *original_filepath, TimestampResponse *res) {
+    char ts_filename[512];
+    snprintf(ts_filename, sizeof(ts_filename), "%s.ts", original_filepath);
+
+    FILE *f = fopen(ts_filename, "wb"); 
+    if (!f) {
+        perror("[Client] Errore creazione file di certificazione");
+        return;
+    }
+
+    fwrite(res, sizeof(TimestampResponse), 1, f);
+    fclose(f);
+
+    printf("[Client] Certificato binario salvato con successo in: %s\n", ts_filename);
 }
 
 int main() {
@@ -67,6 +85,8 @@ int main() {
     uint32_t rx_seq = 1;
 
     AuthRequest auth_req;
+    memset(&auth_req, 0, sizeof(AuthRequest)); // Sempre meglio pulire il buffer
+    
     printf("\n--- Login Sicuro ---\nUsername: ");
     scanf("%31s", auth_req.username);
     printf("Password: ");
@@ -129,6 +149,9 @@ int main() {
             } else if (response_code == OP_TIMESTAMP) {
                 TimestampResponse res; recv_secure(sockfd, &res, sizeof(TimestampResponse), aes_key, &rx_seq);
                 
+                // --- SALVATAGGIO DEL CERTIFICATO ---
+                save_timestamp_to_file(filepath, &res);
+
                 unsigned char data_to_verify_ts[HASH_SIZE + sizeof(time_t)];
                 memcpy(data_to_verify_ts, res.hash, HASH_SIZE);
                 memcpy(data_to_verify_ts + HASH_SIZE, &res.timestamp, sizeof(time_t));
@@ -140,7 +163,7 @@ int main() {
                 }
             }
         }
-        else if ( choice == 3){
+        else if (choice == 3) {
             // OPERAZIONE RICARICA
             int amount;
             printf("Quanti crediti vuoi acquistare? ");
@@ -168,6 +191,56 @@ int main() {
                 } else {
                     printf("\n[Client] Errore durante la ricarica.\n");
                 }
+            }
+        }
+        else if (choice == 4) {
+            // --- OPERAZIONE VERIFICA OFFLINE ---
+            char original_filepath[256];
+            char ts_filepath[512];
+
+            printf("Inserisci il percorso del file ORIGINALE da verificare: ");
+            scanf("%255s", original_filepath);
+            snprintf(ts_filepath, sizeof(ts_filepath), "%s.ts", original_filepath);
+
+            // 1. Apriamo il file originale per ricalcolare l'hash
+            FILE *orig_f = fopen(original_filepath, "rb");
+            if (!orig_f) { perror("[Errore] Impossibile aprire il file originale"); continue; }
+            fseek(orig_f, 0, SEEK_END); long orig_size = ftell(orig_f); fseek(orig_f, 0, SEEK_SET);
+            unsigned char *orig_buffer = malloc(orig_size);
+            fread(orig_buffer, 1, orig_size, orig_f); fclose(orig_f);
+
+            unsigned char calculated_hash[HASH_SIZE];
+            calculate_sha256(orig_buffer, orig_size, calculated_hash);
+            free(orig_buffer);
+
+            // 2. Apriamo il certificato salvato localmente
+            FILE *ts_f = fopen(ts_filepath, "rb");
+            if (!ts_f) { 
+                printf("[Errore] Impossibile trovare il certificato associato: %s\n", ts_filepath); 
+                continue; 
+            }
+            TimestampResponse loaded_ts;
+            fread(&loaded_ts, sizeof(TimestampResponse), 1, ts_f);
+            fclose(ts_f);
+
+            // 3. Confrontiamo l'hash attuale con quello nel certificato
+            if (memcmp(calculated_hash, loaded_ts.hash, HASH_SIZE) != 0) {
+                printf("\nXXX ATTENZIONE: L'hash del file NON corrisponde a quello nel certificato! XXX\n");
+                printf("Il file potrebbe essere stato modificato.\n");
+                continue;
+            }
+
+            // 4. Verifichiamo matematicamente la firma
+            printf("[Client] Hash coincidente. Avvio verifica crittografica della firma del Server...\n");
+            unsigned char data_to_verify_ts[HASH_SIZE + sizeof(time_t)];
+            memcpy(data_to_verify_ts, loaded_ts.hash, HASH_SIZE);
+            memcpy(data_to_verify_ts + HASH_SIZE, &loaded_ts.timestamp, sizeof(time_t));
+
+            if (verify_signature(data_to_verify_ts, sizeof(data_to_verify_ts), loaded_ts.signature, loaded_ts.signature_len, "keys/server_ts_pub.pem") == 1) {
+                printf("\n>>> VVV VERIFICA SUPERATA VVV <<<\n");
+                printf("La firma del Server e' autentica. Il documento esisteva integro alla data: %ld\n", loaded_ts.timestamp);
+            } else {
+                printf("\nXXX VERIFICA FALLITA: La firma digitale del certificato NON e' valida! XXX\n");
             }
         }
     } while (choice != 0);
