@@ -71,6 +71,7 @@ int main() {
     EVP_PKEY *client_dh_key = generate_ephemeral_key();
     ClientHandshake ch_msg;
     export_public_key(client_dh_key, ch_msg.dh_pubkey, &ch_msg.dh_pubkey_len);
+    memcpy(ch_msg.nonce, sh_msg.nonce, NONCE_SIZE);
 
     OpCode op_client = OP_HANDSHAKE_CLIENT;
     send_full(sockfd, &op_client, sizeof(OpCode));

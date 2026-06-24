@@ -45,6 +45,11 @@ void handle_client(int client_fd) {
     ClientHandshake ch_msg;
     recv_full(client_fd, &ch_msg, sizeof(ClientHandshake));
 
+    if (memcmp(ch_msg.nonce, sh_msg.nonce, NONCE_SIZE) != 0) {
+        fprintf(stderr, "[Server] ERRORE: Nonce non corrispondente. Handshake rifiutato.\n");
+        EVP_PKEY_free(server_dh_key); close(client_fd); return;
+    }
+
     EVP_PKEY *client_pub_key = import_public_key(ch_msg.dh_pubkey, ch_msg.dh_pubkey_len);
     unsigned char shared_secret[256]; 
     size_t shared_secret_len;

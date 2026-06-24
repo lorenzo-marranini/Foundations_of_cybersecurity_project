@@ -59,6 +59,7 @@ typedef struct {
 typedef struct {
     unsigned char dh_pubkey[MAX_DH_PUBKEY_LEN]; // Chiave pubblica effimera del client
     size_t dh_pubkey_len;
+    unsigned char nonce[NONCE_SIZE]; // Echo del nonce del server (challenge-response)
 } ClientHandshake;
 
 // 3. Autenticazione dell'utente (viaggerà già CIFRATA)

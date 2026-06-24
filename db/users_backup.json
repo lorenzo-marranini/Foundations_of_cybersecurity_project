@@ -1,13 +1,21 @@
 {
 	"users":	[{
 			"username":	"studenti",
-			"password":	"studenti",
-			"consumed":	9,
+			"salt":	"6556766aab217ba18bd291e5294c1ea0",
+			"password_hash":	"404a303180c3fe5d43d36ea91584ff8130ab24e6a498c34c0a17393d5f95477c",
+			"consumed":	0,
 			"total":	10
 		}, {
 			"username":	"admin",
-			"password":	"adminpassword",
+			"salt":	"a298fc3d952971a790d4a76c22e69d31",
+			"password_hash":	"3f1e1e36561e77882b04c697e51ce27334337ac16044f40fbe508bb3346c387e",
 			"consumed":	0,
 			"total":	100
+		}, {
+			"username":	"testuser",
+			"salt":	"796c1914760c45059b5e7750ee9a51bf",
+			"password_hash":	"a1aa4525a50e306f792679f42b8720ea6d62a9e04d32587dd95d6535d8431c59",
+			"consumed":	0,
+			"total":	1
 		}]
 }

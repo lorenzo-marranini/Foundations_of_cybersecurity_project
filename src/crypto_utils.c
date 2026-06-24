@@ -1,9 +1,10 @@
 #include "../include/crypto_utils.h"
 #include <stdio.h>
 #include <string.h>
-#include <openssl/err.h> 
+#include <openssl/err.h>
 #include <openssl/obj_mac.h>
 #include <openssl/rand.h>
+#include <openssl/evp.h>
 
 
 
@@ -281,6 +282,33 @@ int encrypt_aes_gcm(const unsigned char *plaintext, int plaintext_len,
     if (1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag)) return -1;
     EVP_CIPHER_CTX_free(ctx);
     return ciphertext_len;
+}
+
+// --- Hashing Password con PBKDF2-HMAC-SHA256 ---
+int hash_password_pbkdf2(const char *password, const unsigned char *salt, size_t salt_len, unsigned char *hash_out, size_t hash_len) {
+    if (PKCS5_PBKDF2_HMAC(password, (int)strlen(password), salt, (int)salt_len, 100000, EVP_sha256(), (int)hash_len, hash_out) != 1) {
+        fprintf(stderr, "Errore: PBKDF2 fallita\n");
+        return -1;
+    }
+    return 0;
+}
+
+// --- Conversione Byte -> Hex ---
+void bytes_to_hex(const unsigned char *bytes, size_t len, char *hex_out) {
+    for (size_t i = 0; i < len; i++)
+        sprintf(hex_out + i * 2, "%02x", bytes[i]);
+    hex_out[len * 2] = '\0';
+}
+
+// --- Conversione Hex -> Byte ---
+int hex_to_bytes(const char *hex, size_t hex_len, unsigned char *bytes_out) {
+    if (hex_len % 2 != 0) return -1;
+    for (size_t i = 0; i < hex_len / 2; i++) {
+        unsigned int byte;
+        if (sscanf(hex + i * 2, "%02x", &byte) != 1) return -1;
+        bytes_out[i] = (unsigned char)byte;
+    }
+    return 0;
 }
 
 // --- Decifratura Autenticata (AES-256-GCM con AAD) ---

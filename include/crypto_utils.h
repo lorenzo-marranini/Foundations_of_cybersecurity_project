@@ -31,6 +31,15 @@ int derive_shared_secret(EVP_PKEY *my_key, EVP_PKEY *peer_pub_key, unsigned char
 // Genera un Nonce casuale (per prevenire i Replay Attacks)
 int generate_nonce(unsigned char *nonce, size_t len);
 
+// Deriva l'hash di una password con PBKDF2-HMAC-SHA256 (100k iterazioni)
+int hash_password_pbkdf2(const char *password, const unsigned char *salt, size_t salt_len, unsigned char *hash_out, size_t hash_len);
+
+// Converte byte binari in stringa esadecimale (hex_out deve avere spazio per len*2+1 byte)
+void bytes_to_hex(const unsigned char *bytes, size_t len, char *hex_out);
+
+// Converte una stringa esadecimale in byte binari. Restituisce 0 se OK, -1 se errore.
+int hex_to_bytes(const char *hex, size_t hex_len, unsigned char *bytes_out);
+
 // Deriva una chiave simmetrica a 256 bit (32 byte) dal segreto condiviso DH
 int derive_symmetric_key(const unsigned char *shared_secret, size_t secret_len, unsigned char *symmetric_key);
 

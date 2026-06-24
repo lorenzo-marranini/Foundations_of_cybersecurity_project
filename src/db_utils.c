@@ -3,6 +3,7 @@
 #include <string.h>
 #include "../include/db_utils.h"
 #include "../include/cJSON.h"
+#include "../include/crypto_utils.h"
 
 #define DB_PATH "db/users.json"
 
@@ -43,29 +44,45 @@ int authenticate_user(const char *username, const char *password, User *out_user
         return 0;
     }
 
-    printf("[DB DEBUG] Cerco di autenticare: Username='%s', Password='%s'\n", username, password);
-
     cJSON *users_array = cJSON_GetObjectItemCaseSensitive(json, "users");
     cJSON *user_item = NULL;
     int found = 0;
 
     cJSON_ArrayForEach(user_item, users_array) {
         cJSON *u_name = cJSON_GetObjectItemCaseSensitive(user_item, "username");
-        cJSON *u_pass = cJSON_GetObjectItemCaseSensitive(user_item, "password");
+        cJSON *u_salt = cJSON_GetObjectItemCaseSensitive(user_item, "salt");
+        cJSON *u_hash = cJSON_GetObjectItemCaseSensitive(user_item, "password_hash");
 
-        if (cJSON_IsString(u_name) && cJSON_IsString(u_pass)) {
-            // Stampa cosa sta leggendo dal file per confrontarlo
-            printf("[DB DEBUG] Confronto con JSON -> User: '%s', Pass: '%s'\n", u_name->valuestring, u_pass->valuestring);
-            
-            if (strcmp(u_name->valuestring, username) == 0 && strcmp(u_pass->valuestring, password) == 0) {
-                strncpy(out_user->username, u_name->valuestring, MAX_USERNAME_LEN);
-                strncpy(out_user->password, u_pass->valuestring, MAX_PASSWORD_LEN);
-                out_user->consumed = cJSON_GetObjectItemCaseSensitive(user_item, "consumed")->valueint;
-                out_user->total = cJSON_GetObjectItemCaseSensitive(user_item, "total")->valueint;
-                found = 1;
-                break;
-            }
+        if (!cJSON_IsString(u_name) || !cJSON_IsString(u_salt) || !cJSON_IsString(u_hash))
+            continue;
+
+        if (strcmp(u_name->valuestring, username) != 0)
+            continue;
+
+        // Decode hex salt
+        const char *salt_hex = u_salt->valuestring;
+        size_t salt_hex_len = strlen(salt_hex);
+        unsigned char salt_bytes[64];
+        if (hex_to_bytes(salt_hex, salt_hex_len, salt_bytes) != 0)
+            break;
+
+        // Compute PBKDF2 of the supplied password
+        unsigned char computed_hash[32];
+        if (hash_password_pbkdf2(password, salt_bytes, salt_hex_len / 2, computed_hash, sizeof(computed_hash)) != 0)
+            break;
+
+        // Encode computed hash to hex and compare with stored value
+        char computed_hex[65];
+        bytes_to_hex(computed_hash, sizeof(computed_hash), computed_hex);
+
+        if (strcmp(computed_hex, u_hash->valuestring) == 0) {
+            strncpy(out_user->username, u_name->valuestring, MAX_USERNAME_LEN);
+            out_user->password[0] = '\0';
+            out_user->consumed = cJSON_GetObjectItemCaseSensitive(user_item, "consumed")->valueint;
+            out_user->total = cJSON_GetObjectItemCaseSensitive(user_item, "total")->valueint;
+            found = 1;
         }
+        break;
     }
 
     cJSON_Delete(json);
